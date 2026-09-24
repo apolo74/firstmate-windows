@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { toBashPath } from "./fm-spawn-helper.ts";
 import { readdirSync, readFileSync } from "node:fs";
 
 // Shared wake-dispatch handshake between the Pi watcher extension (the
@@ -166,13 +167,13 @@ export type EligibleRowsSnapshotResult = "published" | "main-owned" | "error";
 
 function runGrantScript(state: string, grantScript: string, args: readonly string[]): number | null {
   try {
-    const result = spawnSync("bash", [grantScript, ...args], {
+    const result = spawnSync("bash", [toBashPath(grantScript), ...args], {
       encoding: "utf8",
       env: {
         ...process.env,
-        FM_STATE_OVERRIDE: state,
-        FM_WAKE_QUEUE: `${state}/.wake-queue`,
-        FM_WAKE_QUEUE_LOCK: `${state}/.wake-queue.lock`,
+        FM_STATE_OVERRIDE: toBashPath(state),
+        FM_WAKE_QUEUE: toBashPath(`${state}/.wake-queue`),
+        FM_WAKE_QUEUE_LOCK: toBashPath(`${state}/.wake-queue.lock`),
       },
     });
     return result.status;

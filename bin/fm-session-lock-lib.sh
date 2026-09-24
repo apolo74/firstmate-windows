@@ -122,7 +122,33 @@ fm_harness_ancestry_pids() {
     pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
     [ -n "$pid" ] && [ "$pid" -gt 1 ] || break
   done
-  [ "$printed" -eq 1 ]
+  if [ "$printed" -eq 1 ]; then
+    return 0
+  fi
+  # Windows fallback: when Git Bash / MSYS2 ps runs isolated (reporting ppid=1),
+  # query Windows process hierarchy to find the harness process (node/pi).
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*)
+      local win_harness
+      win_harness=$(powershell.exe -NoProfile -Command "
+        \$cur = \$PID
+        while (\$cur -gt 0) {
+          \$p = Get-CimInstance Win32_Process -Filter \"ProcessId=\$cur\"
+          if (!\$p) { break }
+          if (\$p.Name -match 'node|claude|codex|pi' -and \$p.CommandLine -match 'pi|claude|codex') {
+            Write-Output \$p.ProcessId
+            break
+          }
+          \$cur = \$p.ParentProcessId
+        }
+      " 2>/dev/null | tr -d '\r\n[:space:]')
+      if [ -n "$win_harness" ] && [ "$win_harness" -gt 1 ] 2>/dev/null; then
+        printf '%s\n' "$win_harness"
+        return 0
+      fi
+      ;;
+  esac
+  return 1
 }
 
 # Print the one pid that identifies this session when the session lock is being

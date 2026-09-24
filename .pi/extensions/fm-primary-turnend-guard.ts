@@ -8,6 +8,7 @@ import {
   classifyFirstmateCurrentOperationalText,
   encodeFirstmateOperationalInput,
 } from "./lib/fm-operational-input.ts";
+import { spawnScript, toBashPath } from "./lib/fm-spawn-helper.ts";
 
 let guardFollowupActive = false;
 
@@ -22,6 +23,12 @@ const marker = `${state}/.pi-turnend-extension-loaded`;
 const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(extensionFile)).digest("hex")}`;
 
 function parentPid(pid: string): string {
+  if (process.platform === "win32") {
+    const result = spawnSync("wmic", ["process", "where", `ProcessId=${pid}`, "get", "ParentProcessId"], { encoding: "utf8" });
+    if (result.status !== 0) return "";
+    const match = result.stdout.match(/\b([0-9]+)\b/g);
+    return match && match.length > 1 ? match[1] : "";
+  }
   const result = spawnSync("ps", ["-o", "ppid=", "-p", pid], { encoding: "utf8" });
   if (result.status !== 0) return "";
   return result.stdout.trim();
@@ -254,24 +261,31 @@ function runSessionstartHook(generation: SessionstartGeneration): Promise<Sessio
     const runner = `${root}/bin/fm-sessionstart-run.sh`;
     let child: ChildProcess;
     try {
-      child = spawn(
-        supervised ? "node" : runner,
-        supervised
-          ? [
-              `${extensionDir}/lib/fm-sessionstart-supervisor.mjs`,
-              runner,
-              "--source",
-              generation.source,
-              "--pi-prerequisite",
-            ]
-          : ["--source", generation.source, "--pi-prerequisite"],
-        {
-          detached: supervised,
-          stdio: supervised
-            ? ["ignore", "pipe", "ignore", "ipc"]
-            : ["ignore", "pipe", "ignore"],
-        },
-      );
+      if (supervised) {
+        child = spawn(
+          "node",
+          [
+            `${extensionDir}/lib/fm-sessionstart-supervisor.mjs`,
+            runner,
+            "--source",
+            generation.source,
+            "--pi-prerequisite",
+          ],
+          {
+            detached: true,
+            stdio: ["ignore", "pipe", "ignore", "ipc"],
+          },
+        );
+      } else {
+        child = spawnScript(
+          runner,
+          ["--source", generation.source, "--pi-prerequisite"],
+          {
+            detached: false,
+            stdio: ["ignore", "pipe", "ignore"],
+          },
+        );
+      }
     } catch {
       settle(generation.stopping ? { kind: "cancelled" } : { kind: "failed" });
       return;
@@ -440,16 +454,16 @@ async function claimSessionstartMessage(
 
 function runGuard(): Promise<{ code: number; stderr: string }> {
   return new Promise((resolveResult) => {
-    const child = spawn(`${root}/bin/fm-turnend-guard.sh`, {
+    const child = spawnScript(`${root}/bin/fm-turnend-guard.sh`, [], {
       stdio: ["pipe", "ignore", "pipe"],
     });
     let stderr = "";
-    child.stderr.on("data", (chunk) => {
+    child.stderr?.on("data", (chunk) => {
       stderr += chunk.toString();
     });
     child.on("error", () => resolveResult({ code: 0, stderr: "" }));
     child.on("close", (code) => resolveResult({ code: code ?? 0, stderr }));
-    child.stdin.end('{"stop_hook_active":false}');
+    child.stdin?.end('{"stop_hook_active":false}');
   });
 }
 
@@ -462,11 +476,11 @@ function runGuard(): Promise<{ code: number; stderr: string }> {
 // script owns its own decision and is inert outside the real primary checkout.
 function runChecker(script: string, command: string): Promise<{ code: number; stderr: string }> {
   return new Promise((resolveResult) => {
-    const child = spawn(`${root}/bin/${script}`, ["--command", command], {
+    const child = spawnScript(`${root}/bin/${script}`, ["--command", command], {
       stdio: ["ignore", "ignore", "pipe"],
     });
     let stderr = "";
-    child.stderr.on("data", (chunk) => {
+    child.stderr?.on("data", (chunk) => {
       stderr += chunk.toString();
     });
     child.on("error", () => resolveResult({ code: 0, stderr: "" }));
