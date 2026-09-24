@@ -10,6 +10,7 @@ import {
   firstmateShellInvocation,
 } from "./lib/fm-operational-input.ts";
 
+
 let guardFollowupActive = false;
 
 type LockOwnership = "owned" | "missing" | "other";
@@ -23,6 +24,12 @@ const marker = `${state}/.pi-turnend-extension-loaded`;
 const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(extensionFile)).digest("hex")}`;
 
 function parentPid(pid: string): string {
+  if (process.platform === "win32") {
+    const result = spawnSync("wmic", ["process", "where", `ProcessId=${pid}`, "get", "ParentProcessId"], { encoding: "utf8" });
+    if (result.status !== 0) return "";
+    const match = result.stdout.match(/\b([0-9]+)\b/g);
+    return match && match.length > 1 ? match[1] : "";
+  }
   const result = spawnSync("ps", ["-o", "ppid=", "-p", pid], { encoding: "utf8" });
   if (result.status !== 0) return "";
   return result.stdout.trim();

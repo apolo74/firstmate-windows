@@ -1,10 +1,10 @@
 <h1 align="center">firstmate</h1>
 <p align="center">
   <a
-    href="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-blue?style=flat-square"
+    href="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square"
     ><img
       alt="Platform"
-      src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-blue?style=flat-square"
+      src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square"
   /></a>
   <a href="https://x.com/kunchenguid"
     ><img
@@ -61,6 +61,15 @@ Full detail on every feature lives in [docs/architecture.md](docs/architecture.m
 - A verified primary agent harness: Claude Code, Grok, Pi, `pi-signed`, Oh My Pi (`omp`), Codex, OpenCode, or Cursor Agent CLI.
 - Git and the GitHub CLI, authenticated through `gh auth login`.
 - The CLI and dependencies for your selected runtime backend; tmux is the reference default.
+
+#### Windows Environment and Requirements
+
+When running directly on Windows (via Git Bash / MSYS2 bash), Firstmate requires:
+
+- **PowerShell**: Used natively for process hierarchy resolution and session locking.
+- **psmux**: A Windows port of tmux that provides the `tmux` CLI (`winget install marlocarlo.psmux`).
+- **treehouse**: Version `v2.3.0` or newer with `--lease` support for managing isolated git worktrees.
+- **Git Bash / MSYS2**: Bash shell environment to execute Firstmate's helper scripts and Pi extension hooks.
 
 The first mate detects and offers to install supported missing tools after you approve.
 Backend-specific setup is linked in [Documentation](#documentation).

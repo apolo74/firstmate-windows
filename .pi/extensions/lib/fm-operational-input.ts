@@ -26,7 +26,7 @@ export function firstmateShellInvocation(
   args: readonly string[],
 ): { command: string; args: string[] } {
   return process.platform === "win32"
-    ? { command: "bash", args: [script, ...args] }
+    ? { command: "bash", args: [script.replace(/\\/g, "/"), ...args] }
     : { command: script, args: [...args] };
 }
 

@@ -1,6 +1,7 @@
 import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { runCommandAsync } from "./fm-async-exec.ts";
+import { toBashPath } from "./fm-spawn-helper.ts";
 
 // Shared wake-dispatch handshake between the Pi watcher extension (the
 // dispatcher) and the supervision-branch extension (the handler), carried over
@@ -451,12 +452,12 @@ async function runGrantScript(
   grantScript: string,
   args: readonly string[],
 ): Promise<number | null> {
-  const result = await runCommandAsync("bash", [grantScript, ...args], {
+  const result = await runCommandAsync("bash", [toBashPath(grantScript), ...args], {
     env: {
       ...process.env,
-      FM_STATE_OVERRIDE: state,
-      FM_WAKE_QUEUE: `${state}/.wake-queue`,
-      FM_WAKE_QUEUE_LOCK: `${state}/.wake-queue.lock`,
+      FM_STATE_OVERRIDE: toBashPath(state),
+      FM_WAKE_QUEUE: toBashPath(`${state}/.wake-queue`),
+      FM_WAKE_QUEUE_LOCK: toBashPath(`${state}/.wake-queue.lock`),
     },
   });
   return result.status;

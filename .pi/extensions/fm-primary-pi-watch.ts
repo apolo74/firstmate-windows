@@ -54,6 +54,7 @@ import {
   FIRSTMATE_CALM_PRESENTATION_EVENT,
 } from "./lib/fm-calm-visibility.ts";
 import { encodeFirstmateOperationalInput } from "./lib/fm-operational-input.ts";
+import { toBashPath } from "./lib/fm-spawn-helper.ts";
 
 type ArmResult = {
   ok: boolean;
@@ -145,7 +146,7 @@ const fmHome = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
 const fmRoot = process.env.FM_ROOT_OVERRIDE || root;
 const state = process.env.FM_STATE_OVERRIDE || `${fmHome}/state`;
 const config = process.env.FM_CONFIG_OVERRIDE || `${fmHome}/config`;
-const armScript = `${fmRoot}/bin/fm-watch-arm.sh`;
+const armScript = toBashPath(`${fmRoot}/bin/fm-watch-arm.sh`);
 const marker = `${state}/.pi-watch-extension-loaded`;
 const handoffDir = `${state}/extensions/pi-primary-watch`;
 const actionableHandoff = `${handoffDir}/session-replacement-actionable.json`;
@@ -214,6 +215,12 @@ function positiveInteger(name: string, fallback: number): number {
 }
 
 function parentPid(pid: string): string {
+  if (process.platform === "win32") {
+    const result = spawnSync("wmic", ["process", "where", `ProcessId=${pid}`, "get", "ParentProcessId"], { encoding: "utf8" });
+    if (result.status !== 0) return "";
+    const match = result.stdout.match(/\b([0-9]+)\b/g);
+    return match && match.length > 1 ? match[1] : "";
+  }
   const result = spawnSync("ps", ["-o", "ppid=", "-p", pid], { encoding: "utf8" });
   if (result.status !== 0) return "";
   return result.stdout.trim();
@@ -619,7 +626,12 @@ export default function (pi: ExtensionAPI) {
         {
           cwd: fmRoot,
           encoding: "utf8",
-          env: { ...process.env, FM_HOME: fmHome, FM_STATE_OVERRIDE: state, FM_ROOT_OVERRIDE: fmRoot },
+          env: {
+            ...process.env,
+            FM_HOME: toBashPath(fmHome),
+            FM_STATE_OVERRIDE: toBashPath(state),
+            FM_ROOT_OVERRIDE: toBashPath(fmRoot),
+          },
         },
       );
       if (result.status === 0) return { ok: true, detail: "" };
@@ -1021,9 +1033,9 @@ export default function (pi: ExtensionAPI) {
     const id = ++owner.seq;
     const env = {
       ...process.env,
-      FM_HOME: fmHome,
-      FM_ROOT_OVERRIDE: fmRoot,
-      FM_CONFIG_OVERRIDE: config,
+      FM_HOME: toBashPath(fmHome),
+      FM_ROOT_OVERRIDE: toBashPath(fmRoot),
+      FM_CONFIG_OVERRIDE: toBashPath(config),
       FM_WATCH_ARM_SCRIPT: armScript,
       FM_WATCH_PREDECESSOR_ARM_PID: predecessorArmPid,
     };

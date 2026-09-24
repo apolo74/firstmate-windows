@@ -79,6 +79,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { toBashPath } from "./lib/fm-spawn-helper.ts";
 // Pi exposes pi-ai to extensions as a first-class module in both its Node
 // and compiled-binary loaders, the same standing as pi-tui and typebox
 // below, and aliases this root specifier to its compat entrypoint.
@@ -142,11 +143,11 @@ const config = process.env.FM_CONFIG_OVERRIDE || `${fmHome}/config`;
 const sessionsDir = join(state, "branch-session");
 const sessionPointer = join(state, ".branch-session");
 const mirrorCursorFile = join(state, ".branch-mirror-cursor");
-const promptScript = join(fmRoot, "bin", "fm-branch-prompt.sh");
-const afkContractScript = join(fmRoot, "bin", "fm-afk-contract.sh");
-const outcomeScript = join(fmRoot, "bin", "fm-branch-outcome.sh");
-const leaseScript = join(fmRoot, "bin", "fm-lease.sh");
-const wakeGrantScript = join(fmRoot, "bin", "fm-wake-grant.sh");
+const promptScript = toBashPath(join(fmRoot, "bin", "fm-branch-prompt.sh"));
+const afkContractScript = toBashPath(join(fmRoot, "bin", "fm-afk-contract.sh"));
+const outcomeScript = toBashPath(join(fmRoot, "bin", "fm-branch-outcome.sh"));
+const leaseScript = toBashPath(join(fmRoot, "bin", "fm-lease.sh"));
+const wakeGrantScript = toBashPath(join(fmRoot, "bin", "fm-wake-grant.sh"));
 const loadedMarker = join(state, ".pi-branch-extension-loaded");
 const modelPinFile = join(config, "supervision-branch-model");
 const effortPinFile = join(config, "supervision-branch-effort");
@@ -212,10 +213,10 @@ type ProviderRecovery = {
 
 const scriptEnv = {
   ...process.env,
-  FM_HOME: fmHome,
-  FM_ROOT_OVERRIDE: fmRoot,
-  FM_STATE_OVERRIDE: state,
-  FM_CONFIG_OVERRIDE: config,
+  FM_HOME: toBashPath(fmHome),
+  FM_ROOT_OVERRIDE: toBashPath(fmRoot),
+  FM_STATE_OVERRIDE: toBashPath(state),
+  FM_CONFIG_OVERRIDE: toBashPath(config),
 };
 
 function offerEligible(offer: BranchDispatchOffer): boolean {
@@ -329,12 +330,24 @@ function modelLabel(model: { provider: string; id: string }): string {
 }
 
 async function parentPid(pid: string): Promise<string> {
+  if (process.platform === "win32") {
+    const result = await runCommandAsync("wmic", ["process", "where", `ProcessId=${pid}`, "get", "ParentProcessId"]);
+    if (result.status !== 0) return "";
+    const match = result.stdout.match(/\b([0-9]+)\b/g);
+    return match && match.length > 1 ? match[1] : "";
+  }
   const result = await runCommandAsync("ps", ["-o", "ppid=", "-p", pid]);
   if (result.status !== 0) return "";
   return result.stdout.trim();
 }
 
 function parentPidSync(pid: string): string {
+  if (process.platform === "win32") {
+    const result = spawnSync("wmic", ["process", "where", `ProcessId=${pid}`, "get", "ParentProcessId"], { encoding: "utf8" });
+    if (result.status !== 0) return "";
+    const match = result.stdout.match(/\b([0-9]+)\b/g);
+    return match && match.length > 1 ? match[1] : "";
+  }
   const result = spawnSync("ps", ["-o", "ppid=", "-p", pid], { encoding: "utf8" });
   if (result.status !== 0) return "";
   return result.stdout.trim();
